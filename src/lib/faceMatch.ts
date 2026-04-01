@@ -55,10 +55,12 @@ export function computeDistance(
 }
 
 export function distanceToConfidence(distance: number): number {
-  // Distance of 0 = perfect match, ~0.6 = threshold, >1.0 = definitely different
-  const MATCH_THRESHOLD = 0.6;
-  const confidence = Math.max(0, (1 - distance / MATCH_THRESHOLD) * 100);
-  return Math.min(100, Math.round(confidence * 10) / 10);
+  // Sigmoid-based mapping: 0.0 → ~100%, 0.6 → ~50%, 1.0+ → near 0%
+  // k controls steepness, midpoint is the match threshold
+  const midpoint = 0.6;
+  const k = 6;
+  const confidence = 100 / (1 + Math.exp(k * (distance - midpoint)));
+  return Math.round(confidence * 10) / 10;
 }
 
 export function isMatch(distance: number): boolean {
