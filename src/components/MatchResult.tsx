@@ -56,7 +56,7 @@ export default function MatchResult({
           />
         </div>
         <p className="text-xs text-zinc-500 mt-2">
-          Cosine similarity: {similarity.toFixed(4)} (threshold: 0.45)
+          Cosine similarity: {similarity.toFixed(4)} (threshold: 0.35)
         </p>
       </div>
     </div>

@@ -104,7 +104,7 @@ function extractFivePoints(
   return [
     avg(pts.slice(36, 42)), // left eye center
     avg(pts.slice(42, 48)), // right eye center
-    [pts[30].x, pts[30].y], // nose tip
+    [pts[33].x, pts[33].y], // nose tip (point 33, not 30 which is nose bridge)
     [pts[48].x, pts[48].y], // left mouth corner
     [pts[54].x, pts[54].y], // right mouth corner
   ];
@@ -298,15 +298,15 @@ export function computeSimilarity(
 }
 
 export function similarityToConfidence(similarity: number): number {
-  // Sigmoid: midpoint at 0.45, steepness 12
-  const midpoint = 0.45;
-  const k = 12;
+  // Sigmoid: midpoint at match threshold, steepness 10
+  const midpoint = 0.35;
+  const k = 10;
   const confidence = 100 / (1 + Math.exp(-k * (similarity - midpoint)));
   return Math.round(confidence * 10) / 10;
 }
 
 export function isMatch(similarity: number): boolean {
-  return similarity > 0.45;
+  return similarity > 0.35;
 }
 
 // ---------------------------------------------------------------------------
