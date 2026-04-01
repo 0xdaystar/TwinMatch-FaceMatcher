@@ -7,8 +7,8 @@ import MatchResult from "@/components/MatchResult";
 import {
   loadModels,
   detectFace,
-  computeDistance,
-  distanceToConfidence,
+  computeSimilarity,
+  similarityToConfidence,
   isMatch,
   type FaceDetectionResult,
 } from "@/lib/faceMatch";
@@ -34,7 +34,7 @@ export default function Home() {
   const [face1, setFace1] = useState<FaceData | null>(null);
   const [face2, setFace2] = useState<FaceData | null>(null);
   const [result, setResult] = useState<{
-    distance: number;
+    similarity: number;
     confidence: number;
     match: boolean;
   } | null>(null);
@@ -86,11 +86,11 @@ export default function Home() {
         prev ? { ...prev, detection: det2 } : null
       );
 
-      const distance = computeDistance(det1.descriptor, det2.descriptor);
-      const confidence = distanceToConfidence(distance);
-      const match = isMatch(distance);
+      const similarity = computeSimilarity(det1.descriptor, det2.descriptor);
+      const confidence = similarityToConfidence(similarity);
+      const match = isMatch(similarity);
 
-      setResult({ distance, confidence, match });
+      setResult({ similarity, confidence, match });
       setStatus("done");
     } catch (err) {
       console.error(err);
@@ -228,7 +228,7 @@ export default function Home() {
         {/* Result */}
         {result && (
           <MatchResult
-            distance={result.distance}
+            similarity={result.similarity}
             confidence={result.confidence}
             match={result.match}
           />
@@ -254,7 +254,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="text-xs text-zinc-400 text-center mt-8">
-          Powered by face-api.js &amp; TensorFlow.js. No data is sent to any server.
+          Powered by ArcFace, face-api.js &amp; ONNX Runtime. No data is sent to any server.
         </footer>
       </main>
     </div>

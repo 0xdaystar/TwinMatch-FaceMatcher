@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Use webpack for compatibility with face-api.js
   turbopack: {},
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -13,6 +12,18 @@ const nextConfig: NextConfig = {
       };
     }
     return config;
+  },
+  async headers() {
+    return [
+      {
+        source: "/onnx/:path*",
+        headers: [
+          { key: "Content-Type", value: "application/wasm" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          { key: "Cross-Origin-Embedder-Policy", value: "require-corp" },
+        ],
+      },
+    ];
   },
 };
 

@@ -1,13 +1,13 @@
 "use client";
 
 interface MatchResultProps {
-  distance: number;
+  similarity: number;
   confidence: number;
   match: boolean;
 }
 
 export default function MatchResult({
-  distance,
+  similarity,
   confidence,
   match,
 }: MatchResultProps) {
@@ -56,7 +56,7 @@ export default function MatchResult({
           />
         </div>
         <p className="text-xs text-zinc-500 mt-2">
-          Euclidean distance: {distance.toFixed(4)} (threshold: 0.6)
+          Cosine similarity: {similarity.toFixed(4)} (threshold: 0.45)
         </p>
       </div>
     </div>
