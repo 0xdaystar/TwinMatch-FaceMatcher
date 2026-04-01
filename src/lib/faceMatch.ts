@@ -39,10 +39,15 @@ export async function loadModels(
   if (!arcfaceSession) {
     onProgress?.("ArcFace (ONNX)");
     ort.env.wasm.wasmPaths = "/onnx/";
-    arcfaceSession = await ort.InferenceSession.create(
+    // Disable multi-threading to avoid SharedArrayBuffer requirement
+    ort.env.wasm.numThreads = 1;
+    const modelUrl = new URL(
       `${MODEL_URL}/w600k_mbf.onnx`,
-      { executionProviders: ["wasm"] }
-    );
+      window.location.href
+    ).href;
+    arcfaceSession = await ort.InferenceSession.create(modelUrl, {
+      executionProviders: ["wasm"],
+    });
   }
 }
 

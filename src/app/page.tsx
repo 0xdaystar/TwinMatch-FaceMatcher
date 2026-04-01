@@ -93,8 +93,9 @@ export default function Home() {
       setResult({ similarity, confidence, match });
       setStatus("done");
     } catch (err) {
-      console.error(err);
-      setError("Something went wrong. Please try again.");
+      console.error("Face comparison error:", err);
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(`Error: ${msg}`);
       setStatus("error");
     }
   }, []);
