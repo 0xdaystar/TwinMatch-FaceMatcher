@@ -153,51 +153,92 @@ function computeSimilarityTransform(
 }
 
 // ---------------------------------------------------------------------------
-// Warp face to 112x112 aligned crop using canvas
+// Warp face to 112x112 aligned crop via explicit pixel sampling.
+// For each output pixel, compute the corresponding source pixel using
+// the INVERSE of the similarity transform, then bilinear-sample.
 // ---------------------------------------------------------------------------
 function alignFace(
   image: HTMLImageElement | HTMLCanvasElement,
   fivePoints: [number, number][]
 ): HTMLCanvasElement {
   const SIZE = 112;
-  const canvas = document.createElement("canvas");
-  canvas.width = SIZE;
-  canvas.height = SIZE;
-  const ctx = canvas.getContext("2d")!;
 
-  // Compute transform: source landmarks → ArcFace template
+  // 1. Get source pixel data
+  const srcCanvas = document.createElement("canvas");
+  const srcW = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
+  const srcH = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
+  srcCanvas.width = srcW;
+  srcCanvas.height = srcH;
+  const srcCtx = srcCanvas.getContext("2d")!;
+  srcCtx.drawImage(image, 0, 0, srcW, srcH);
+  const srcData = srcCtx.getImageData(0, 0, srcW, srcH).data;
+
+  // 2. Compute FORWARD transform: source landmarks → template landmarks
   const { a, b, tx, ty } = computeSimilarityTransform(
     fivePoints,
     ARCFACE_TEMPLATE
   );
 
-  // Canvas setTransform maps from destination to source, so we need the
-  // INVERSE of our transform.  For a similarity transform:
-  //   M     = [ a  -b  tx ]     M_inv = (1/det) * [ a   b  -(a*tx + b*ty)  ]
-  //           [ b   a  ty ]                        [ -b  a   (b*tx - a*ty)  ]
-  // det = a^2 + b^2
+  // 3. Compute INVERSE transform (template pixel → source pixel)
+  //    Forward: [dx] = [ a  -b ] [sx] + [tx]
+  //             [dy]   [ b   a ] [sy]   [ty]
+  //    Inverse: [sx] = (1/det) * [ a   b ] [dx - tx]
+  //             [sy]              [-b   a ] [dy - ty]
   const det = a * a + b * b;
-  const ai = a / det;
-  const bi = b / det;
-  const txi = -(ai * tx + bi * ty);
-  const tyi = (bi * tx - ai * ty);
+  const ia = a / det;
+  const ib = b / det;
 
-  // setTransform(a, b, c, d, e, f) sets the matrix:
-  //   [ a  c  e ]
-  //   [ b  d  f ]
-  // We want the inverse mapping (dst pixel → src pixel) because canvas
-  // drawImage uses the transform to map the *source* into the *destination*.
-  // Actually canvas transform maps user-space to device-space, which means
-  // we provide the FORWARD transform and canvas applies it.
-  ctx.setTransform(a, b, -b, a, tx, ty);
+  // 4. Build output 112x112 by sampling source pixels
+  const dstCanvas = document.createElement("canvas");
+  dstCanvas.width = SIZE;
+  dstCanvas.height = SIZE;
+  const dstCtx = dstCanvas.getContext("2d")!;
+  const dstImageData = dstCtx.createImageData(SIZE, SIZE);
+  const dst = dstImageData.data;
 
-  // Draw the source image — canvas will apply the affine transform
-  ctx.drawImage(image, 0, 0);
+  for (let dy = 0; dy < SIZE; dy++) {
+    for (let dx = 0; dx < SIZE; dx++) {
+      // Map output pixel back to source coordinates
+      const rx = dx - tx;
+      const ry = dy - ty;
+      const sx = ia * rx + ib * ry;
+      const sy = -ib * rx + ia * ry;
 
-  // Reset transform for any later drawing
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // Bilinear sample from source
+      const x0 = Math.floor(sx);
+      const y0 = Math.floor(sy);
+      const x1 = x0 + 1;
+      const y1 = y0 + 1;
+      const fx = sx - x0;
+      const fy = sy - y0;
 
-  return canvas;
+      const dIdx = (dy * SIZE + dx) * 4;
+
+      if (x0 >= 0 && x1 < srcW && y0 >= 0 && y1 < srcH) {
+        const i00 = (y0 * srcW + x0) * 4;
+        const i10 = (y0 * srcW + x1) * 4;
+        const i01 = (y1 * srcW + x0) * 4;
+        const i11 = (y1 * srcW + x1) * 4;
+        const w00 = (1 - fx) * (1 - fy);
+        const w10 = fx * (1 - fy);
+        const w01 = (1 - fx) * fy;
+        const w11 = fx * fy;
+
+        for (let c = 0; c < 4; c++) {
+          dst[dIdx + c] = Math.round(
+            srcData[i00 + c] * w00 +
+            srcData[i10 + c] * w10 +
+            srcData[i01 + c] * w01 +
+            srcData[i11 + c] * w11
+          );
+        }
+      }
+      // Out-of-bounds pixels stay (0,0,0,0) — black
+    }
+  }
+
+  dstCtx.putImageData(dstImageData, 0, 0);
+  return dstCanvas;
 }
 
 // ---------------------------------------------------------------------------
