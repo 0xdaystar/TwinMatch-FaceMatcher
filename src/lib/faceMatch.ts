@@ -65,57 +65,85 @@ export function isMatch(distance: number): boolean {
   return distance < 0.6;
 }
 
+/**
+ * Compute the object-cover transform: how CSS object-cover maps
+ * source image coordinates to the displayed container.
+ */
+function objectCoverTransform(
+  srcW: number,
+  srcH: number,
+  dstW: number,
+  dstH: number
+): { scale: number; offsetX: number; offsetY: number } {
+  const scale = Math.max(dstW / srcW, dstH / srcH);
+  const offsetX = (dstW - srcW * scale) / 2;
+  const offsetY = (dstH - srcH * scale) / 2;
+  return { scale, offsetX, offsetY };
+}
+
 export function drawLandmarks(
   canvas: HTMLCanvasElement,
   detection: FaceDetectionResult["detection"],
   sourceWidth: number,
   sourceHeight: number
 ): void {
-  const displaySize = { width: canvas.width, height: canvas.height };
-  faceapi.matchDimensions(canvas, { width: sourceWidth, height: sourceHeight });
-
-  const resizedDetection = faceapi.resizeResults(detection, displaySize);
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // Compute the same transform CSS object-cover applies
+  const { scale, offsetX, offsetY } = objectCoverTransform(
+    sourceWidth,
+    sourceHeight,
+    canvas.width,
+    canvas.height
+  );
+
+  // Helper: map a point from source image coords to canvas coords
+  const mapX = (x: number) => x * scale + offsetX;
+  const mapY = (y: number) => y * scale + offsetY;
+
   // Draw face bounding box
-  const box = resizedDetection.detection.box;
+  const box = detection.detection.box;
   ctx.strokeStyle = "#00ff88";
   ctx.lineWidth = 2;
-  ctx.strokeRect(box.x, box.y, box.width, box.height);
+  ctx.strokeRect(
+    mapX(box.x),
+    mapY(box.y),
+    box.width * scale,
+    box.height * scale
+  );
 
-  // Draw landmarks
-  const landmarks = resizedDetection.landmarks;
-  const positions = landmarks.positions;
-
+  // Draw landmark points
+  const positions = detection.landmarks.positions;
   for (const point of positions) {
     ctx.beginPath();
-    ctx.arc(point.x, point.y, 2, 0, 2 * Math.PI);
+    ctx.arc(mapX(point.x), mapY(point.y), 2.5, 0, 2 * Math.PI);
     ctx.fillStyle = "#00ff88";
     ctx.fill();
   }
 
   // Draw connections for key features
-  const jawline = landmarks.getJawOutline();
-  const leftEyeBrow = landmarks.getLeftEyeBrow();
-  const rightEyeBrow = landmarks.getRightEyeBrow();
-  const nose = landmarks.getNose();
-  const leftEye = landmarks.getLeftEye();
-  const rightEye = landmarks.getRightEye();
-  const mouth = landmarks.getMouth();
-
-  const features = [jawline, leftEyeBrow, rightEyeBrow, nose, leftEye, rightEye, mouth];
+  const landmarks = detection.landmarks;
+  const features = [
+    landmarks.getJawOutline(),
+    landmarks.getLeftEyeBrow(),
+    landmarks.getRightEyeBrow(),
+    landmarks.getNose(),
+    landmarks.getLeftEye(),
+    landmarks.getRightEye(),
+    landmarks.getMouth(),
+  ];
 
   ctx.strokeStyle = "rgba(0, 255, 136, 0.5)";
   ctx.lineWidth = 1;
 
   for (const feature of features) {
     ctx.beginPath();
-    ctx.moveTo(feature[0].x, feature[0].y);
+    ctx.moveTo(mapX(feature[0].x), mapY(feature[0].y));
     for (let i = 1; i < feature.length; i++) {
-      ctx.lineTo(feature[i].x, feature[i].y);
+      ctx.lineTo(mapX(feature[i].x), mapY(feature[i].y));
     }
     ctx.stroke();
   }

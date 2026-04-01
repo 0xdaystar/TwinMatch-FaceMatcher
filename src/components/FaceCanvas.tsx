@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import type { FaceDetectionResult } from "@/lib/faceMatch";
 
 interface FaceCanvasProps {
@@ -19,21 +19,31 @@ export default function FaceCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container || !detection) return;
 
-    // Match canvas to displayed image size
     const rect = container.getBoundingClientRect();
+    // Set canvas pixel dimensions to match the container's CSS size
     canvas.width = rect.width;
     canvas.height = rect.height;
 
-    // Import dynamically to avoid SSR issues
     import("@/lib/faceMatch").then(({ drawLandmarks }) => {
       drawLandmarks(canvas, detection.detection, imageWidth, imageHeight);
     });
   }, [detection, imageWidth, imageHeight]);
+
+  useEffect(() => {
+    draw();
+
+    // Redraw if the container resizes (e.g. window resize)
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(draw);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [draw]);
 
   return (
     <div ref={containerRef} className="relative w-full aspect-square max-w-[320px] rounded-2xl overflow-hidden">
